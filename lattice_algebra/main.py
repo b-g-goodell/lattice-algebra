@@ -394,7 +394,7 @@ class LatticeParameters(object):
         elif length < 1:
             raise ValueError('LatticeParameters requires positive integer length.')
         elif modulus < 3 or not is_ntt_friendly_prime(modulus=modulus, degree=degree):
-            raise ValueError('LatticeParameters requires NTT-friendly prime modulus-degree pair.')
+            raise ValueError(f'LatticeParameters requires NTT-friendly prime modulus-degree pair, but had q={modulus}, d={degree}, and q-1 mod 2*d = {(modulus-1)%(2*degree)}.')
 
         self.degree = degree
         self.length = length
