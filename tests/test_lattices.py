@@ -1908,11 +1908,7 @@ def test_const_time_arithmetic_is_const_time():
         sample_mean: float = sum(observed_times)/len(observed_times)
         sample_var: float = sum((j - sample_mean)**2 for j in observed_times)/(len(observed_times)-1)
         sample_stdev: float = sqrt(sample_var)
-        tmp: float = sqrt(len(observed_times)-1) * sample_stdev
-        lower_bound_on_stdev: float = -tmp/sqrt(upper_chi_sq_score)
-        upper_bound_on_stdev: float = tmp/sqrt(upper_chi_sq_score)
-        observations += [lower_bound_on_stdev <= 0 <= upper_bound_on_stdev]  # count "success" if 0 is in the interval
+        observations += [sample_mean/sample_stdev]  # count "success" if 0 is in the interval
 
-    est_prop: float = sum(observations)/len(observations)
-    prop_ci_width: float = z_score*sqrt(est_prop*(1-est_prop)/len(observations))
-    assert est_prop + prop_ci_width >= 1.0
+    sample_mean: float = sum(observations)/len(observations)
+    assert sample_mean >= 2  # weak ass test yo
