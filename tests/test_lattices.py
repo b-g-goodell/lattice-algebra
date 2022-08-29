@@ -10,8 +10,16 @@ from lattice_algebra.main import *
 from copy import deepcopy
 from secrets import randbelow, randbits
 from typing import List, Tuple, Dict
+from timeit import default_timer as timer
 
 sample_size_for_random_tests: int = 2 ** 3
+sample_size_for_const_time_testing: int = 101  # 100 degrees of freedom for chi-squared testing
+repetitions_for_const_time_testing: int = 2**5
+# 95th %-ile of Chi squared dist with 100 DF = 101 samples
+lower_chi_sq_score: float = 74.22
+upper_chi_sq_score: float = 129.56
+# 99.994th %-ile of Normal dist
+z_score = 4.0
 
 small_q_for_testing: int = 17
 small_non_prime_for_testing: int = 16
@@ -1857,3 +1865,54 @@ def test_decode_bitstring_to_coefficients():
                 btd=bits_to_decode
             )
             assert expected_result == observed_result
+
+
+def test_const_time_arithmetic_is_const_time():
+    observations: list = []
+    for i in range(repetitions_for_const_time_testing):
+        sampled_as: list[Polynomial] = [random_polynomial(
+            secpar=secpar4testing, lp=lp_for_testing, distribution=UNIFORM_INFINITY_WEIGHT, dist_pars=small_dist_pars,
+            num_coefs=small_dist_pars['wt'], bti=bits_to_indices_for_testing,
+            btd=bits_to_decode_for_testing
+        ) for _ in range(sample_size_for_const_time_testing)]
+        assert all(isinstance(a, Polynomial) for a in sampled_as)
+
+        sampled_fs: list[PolynomialVector] = [random_polynomialvector(
+            secpar=secpar4testing, lp=lp_for_testing, distribution=UNIFORM_INFINITY_WEIGHT, dist_pars=small_dist_pars,
+            num_coefs=small_dist_pars['wt'], bti=bits_to_indices_for_testing,
+            btd=bits_to_decode_for_testing
+        ) for _ in range(sample_size_for_const_time_testing)]
+        assert all(isinstance(f, PolynomialVector) for f in sampled_fs)
+
+        sampled_bs: list[Polynomial] = [random_polynomial(
+            secpar=secpar4testing, lp=lp_for_testing, distribution=UNIFORM_INFINITY_WEIGHT, dist_pars=small_dist_pars,
+            num_coefs=small_dist_pars['wt'], bti=bits_to_indices_for_testing,
+            btd=bits_to_decode_for_testing
+        ) for _ in range(sample_size_for_const_time_testing)]
+        assert all(isinstance(b, Polynomial) for b in sampled_bs)
+
+        sampled_gs: list[PolynomialVector] = [random_polynomialvector(
+            secpar=secpar4testing, lp=lp_for_testing, distribution=UNIFORM_INFINITY_WEIGHT, dist_pars=small_dist_pars,
+            num_coefs=small_dist_pars['wt'], bti=bits_to_indices_for_testing,
+            btd=bits_to_decode_for_testing
+        ) for _ in range(sample_size_for_const_time_testing)]
+        assert all(isinstance(g, PolynomialVector) for g in sampled_gs)
+
+        observed_times = []
+        for a, f, b, g in zip(sampled_as, sampled_fs, sampled_bs, sampled_gs):
+            start = timer()
+            h: PolynomialVector = f**a + g**b
+            end = timer()
+            observed_times += [end - start]
+
+        sample_mean: float = sum(observed_times)/len(observed_times)
+        sample_var: float = sum((j - sample_mean)**2 for j in observed_times)/(len(observed_times)-1)
+        sample_stdev: float = sqrt(sample_var)
+        tmp: float = sqrt(len(observed_times)-1) * sample_stdev
+        lower_bound_on_stdev: float = -tmp/sqrt(upper_chi_sq_score)
+        upper_bound_on_stdev: float = tmp/sqrt(upper_chi_sq_score)
+        observations += [lower_bound_on_stdev <= 0 <= upper_bound_on_stdev]  # count "success" if 0 is in the interval
+
+    est_prop: float = sum(observations)/len(observations)
+    prop_ci_width: float = z_score*sqrt(est_prop*(1-est_prop)/len(observations))
+    assert est_prop + prop_ci_width >= 1.0
