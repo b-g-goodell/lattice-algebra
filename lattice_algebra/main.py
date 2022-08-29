@@ -41,27 +41,12 @@ from hashlib import shake_256 as shake
 from typing import List, Dict, Tuple, Union
 
 
-seen_bits_to_indices: dict[tuple, int] = {}
-
-
 def bits_to_indices(secpar: int, degree: int, wt: int) -> int:
-    x = (secpar, degree, wt)
-    if x not in seen_bits_to_indices:
-        seen_bits_to_indices[x] = ceil(log2(degree)) + (wt - 1) * (ceil(log2(degree)) + secpar)
-    return seen_bits_to_indices[x]
-
-
-seen_bits_to_decode: dict[tuple, int] = {}
+    return ceil(log2(degree)) + (wt - 1) * (ceil(log2(degree)) + secpar)
 
 
 def bits_to_decode(secpar: int, bd: int) -> int:
-    x = (secpar, bd)
-    if x not in seen_bits_to_decode:
-        seen_bits_to_decode[x] = ceil(log2(bd)) + 1 + secpar
-    return seen_bits_to_decode[x]
-
-
-seen_is_prime: dict[int, bool] = {}
+    return ceil(log2(bd)) + 1 + secpar
 
 
 def is_prime(val: int) -> bool:
@@ -74,12 +59,7 @@ def is_prime(val: int) -> bool:
     :return: Indicate whether q is prime.
     :rtype: bool
     """
-    if val not in seen_is_prime:
-        seen_is_prime[val] = all([val % i != 0 for i in range(2, ceil(sqrt(val)) + 1)])
-    return seen_is_prime[val]
-
-
-seen_is_pow_two: dict[int, bool] = {}
+    return all([val % i != 0 for i in range(2, ceil(sqrt(val)) + 1)])
 
 
 def is_pow_two(val: int) -> bool:
@@ -92,25 +72,14 @@ def is_pow_two(val: int) -> bool:
     :return: Indicate whether x is a power-of-two.
     :rtype: bool
     """
-    if val not in seen_is_pow_two:
-        seen_is_pow_two[val] = val > 0 and not (val & (val - 1))
-    return seen_is_pow_two[val]
-
-
-seen_has_prim_rou: dict[tuple, bool] = {}
+    return val > 0 and not (val & (val - 1))
 
 
 def has_prim_rou(modulus: int, degree: int) -> bool:
     """
     Test whether Z/qZ has a primitive 2d-th root of unity.
     """
-    x = (modulus, degree)
-    if x not in seen_has_prim_rou:
-        seen_has_prim_rou[x] = modulus % (2*degree) == 1
-    return seen_has_prim_rou[x]
-
-
-seen_is_ntt_friendly_prime: dict[tuple, bool] = {}
+    return modulus % (2 * degree) == 1
 
 
 def is_ntt_friendly_prime(modulus: int, degree: int) -> bool:
@@ -125,13 +94,7 @@ def is_ntt_friendly_prime(modulus: int, degree: int) -> bool:
     :return: Indicate whether q is prime and q-1 == 0 mod 2d.
     :rtype: bool
     """
-    x = (modulus, degree)
-    if x not in seen_is_ntt_friendly_prime:
-        seen_is_ntt_friendly_prime[x] = is_prime(modulus) and is_pow_two(degree) and has_prim_rou(modulus=modulus, degree=degree)
-    return seen_is_ntt_friendly_prime[x]
-
-
-seen_is_prim_rou: dict[tuple, int] = {}
+    return is_prime(modulus) and is_pow_two(degree) and has_prim_rou(modulus=modulus, degree=degree)
 
 
 def is_prim_rou(modulus: int, degree: int, val: int) -> bool:
@@ -149,13 +112,7 @@ def is_prim_rou(modulus: int, degree: int, val: int) -> bool:
     :return: Boolean indicating x**(2d) == 1 and x**i != 1 for 1 <= i < 2d.
     :rtype: bool
     """
-    x = (modulus, degree, val)
-    if x not in seen_is_prim_rou:
-        seen_is_prim_rou[x] = all(val ** k % modulus != 1 for k in range(1, 2 * degree)) and val ** (2 * degree) % modulus == 1
-    return seen_is_prim_rou[x]
-
-
-seen_get_prim_rou_and_rou_inv: dict = {}
+    return all(val ** k % modulus != 1 for k in range(1, 2 * degree)) and val ** (2 * degree) % modulus == 1
 
 
 def get_prim_rou_and_rou_inv(modulus: int, degree: int) -> Union[None, Tuple[int, int]]:
@@ -173,15 +130,13 @@ def get_prim_rou_and_rou_inv(modulus: int, degree: int) -> Union[None, Tuple[int
     """
     if not (is_ntt_friendly_prime(modulus, degree)):
         raise ValueError('Input q and d are not ntt-friendly prime and degree.')
-    x = (modulus, degree)
-    if x not in seen_get_prim_rou_and_rou_inv:
-        y: int = 2
-        while y < modulus:
-            if is_prim_rou(modulus, degree, y):
-                break
-            y += 1
-        seen_get_prim_rou_and_rou_inv[x] = y, ((y ** (2 * degree - 1)) % modulus)
-    return seen_get_prim_rou_and_rou_inv[x]
+    # If we do not raise a ValueError, then there exists a primitive root of unity 2 <= x < q.
+    x: int = 2
+    while x < modulus:
+        if is_prim_rou(modulus, degree, x):
+            break
+        x += 1
+    return x, ((x ** (2 * degree - 1)) % modulus)
 
 
 def is_bitstring(val: str) -> bool:
@@ -439,7 +394,7 @@ class LatticeParameters(object):
         elif length < 1:
             raise ValueError('LatticeParameters requires positive integer length.')
         elif modulus < 3 or not is_ntt_friendly_prime(modulus=modulus, degree=degree):
-            raise ValueError(f'LatticeParameters requires NTT-friendly prime modulus-degree pair, but had q={modulus}, d={degree}, and q-1 mod 2*d = {(modulus-1)%(2*degree)}.')
+            raise ValueError('LatticeParameters requires NTT-friendly prime modulus-degree pair.')
 
         self.degree = degree
         self.length = length
@@ -1040,7 +995,7 @@ class Polynomial(object):
             coefs = [x if x <= self.lp.modulus // 2 else x - self.lp.modulus for x in coefs]
         coefs_dict: Dict[int, int] = {index: value for index, value in enumerate(coefs) if value != 0}
         if not coefs_dict:
-            return 0, 0, 0
+            return coefs_dict, 0, 0
         return coefs_dict, max(abs(coefs_dict[value]) for value in coefs_dict), len(coefs_dict)
 
     def to_bytes(self) -> bytearray:
@@ -1291,8 +1246,8 @@ class PolynomialVector(object):
     def __repr__(self) -> str:
         """
         A canonical string representation of a PolynomialVector object: str(self.entries).
-        
-        :return: 
+
+        :return:
         :rtype: str
         """
         return str(self.entries)
